@@ -1,0 +1,75 @@
+default_platform(:mac)
+require "shellwords"
+
+ROOT_DIR = File.expand_path("..", __dir__)
+ROOT = Shellwords.escape(ROOT_DIR)
+
+platform :mac do
+  desc "Generate Mac App Store screenshots from the local app"
+  lane :screenshots do
+    sh("cd #{ROOT} && ./script/generate_app_store_screenshots.sh")
+  end
+
+  desc "Build and sign the Mac App Store pkg"
+  lane :package do
+    sh("cd #{ROOT} && ./script/package_app_store.sh").lines.last.strip
+  end
+
+  desc "Upload Prompt Producer App Privacy answers"
+  lane :privacy do
+    upload_app_privacy_details_to_app_store(
+      username: ENV.fetch("FASTLANE_USER"),
+      app_identifier: "aloes",
+      json_path: "fastlane/app_privacy_details.json"
+    )
+  end
+
+  desc "Upload Prompt Producer and submit it for Mac App Store review"
+  lane :submit_review do
+    pkg_path = package
+
+    review_information = {
+      first_name: "Harborline",
+      last_name: "Support",
+      phone_number: ENV.fetch("APP_REVIEW_PHONE", "+14158515000"),
+      email_address: "help@pdx.software",
+      notes: "Prompt Producer does not require an account or subscription. To test: open the app, create or edit a saved prompt in the prompt library, use the AI button in the editor on macOS 26 or newer with Apple Foundation Models available, and press Command-Shift-U to open the global command bar. The command bar can copy a selected prompt; if Accessibility and Automation permissions are granted, Enter can also paste the prompt into the previously active text field. Prompt search uses local Fuse.js fuzzy search across titles, bodies, and tags. AI generation uses Apple on-device Foundation Models. Prompts are stored locally. No in-app purchases are included."
+    }
+
+    deliver(
+      api_key: app_store_connect_api_key(
+        key_id: sh("doppler secrets get APP_STORE_CONNECT_KEY_ID --plain --project quickapp --config dev", log: false).strip,
+        issuer_id: sh("doppler secrets get APP_STORE_CONNECT_ISSUER_ID --plain --project quickapp --config dev", log: false).strip,
+        key_content: sh("doppler secrets get APP_STORE_CONNECT_P8 --plain --project quickapp --config dev", log: false),
+        is_key_content_base64: false,
+        in_house: false
+      ),
+      app_identifier: "aloes",
+      app_version: ENV.fetch("PROMPT_PRODUCER_VERSION", "1.0"),
+      platform: "osx",
+      pkg: pkg_path,
+      screenshots_path: "fastlane/screenshots",
+      metadata_path: "fastlane/metadata",
+      skip_metadata: false,
+      skip_screenshots: ENV["PROMPT_PRODUCER_SKIP_SCREENSHOTS"] == "1",
+      overwrite_screenshots: ENV["PROMPT_PRODUCER_SKIP_SCREENSHOTS"] != "1",
+      submit_for_review: true,
+      reject_if_possible: true,
+      automatic_release: false,
+      force: true,
+      copyright: "2026 Harborline",
+      primary_category: "PRODUCTIVITY",
+      precheck_include_in_app_purchases: false,
+      app_review_information: review_information,
+      submission_information: {
+        add_id_info_serves_ads: false,
+        add_id_info_tracks_action: false,
+        add_id_info_tracks_install: false,
+        content_rights_contains_third_party_content: false,
+        content_rights_has_rights: false,
+        export_compliance_uses_encryption: false,
+        add_id_info_uses_idfa: false
+      }
+    )
+  end
+end

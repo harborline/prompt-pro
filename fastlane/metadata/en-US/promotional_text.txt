@@ -1,0 +1,1 @@
+Search, preview, copy, and refine reusable AI prompts from a global hotkey or menu bar app. Apple Foundation Models keep generation local.

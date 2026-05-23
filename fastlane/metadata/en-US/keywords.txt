@@ -1,0 +1,1 @@
+prompts,AI,LLM,command bar,hotkey,local,BlockNote,productivity,writing

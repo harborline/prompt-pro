@@ -1,0 +1,29 @@
+{
+  "scripts": {
+    "build:blocknote": "vite build --config web/blocknote-editor/vite.config.mjs",
+    "test:web": "vitest run --config web/blocknote-editor/vitest.config.mjs"
+  },
+  "dependencies": {
+    "@blocknote/core": "0.51.2",
+    "@blocknote/mantine": "0.51.2",
+    "@blocknote/react": "0.51.2",
+    "@blocknote/xl-ai": "^0.51.2",
+    "@mantine/core": "9.2.1",
+    "@mantine/hooks": "9.2.1",
+    "fuse.js": "^7.1.0",
+    "react": "19.2.6",
+    "react-dom": "19.2.6"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.0",
+    "@testing-library/react": "16.3.2",
+    "@types/node": "25.9.1",
+    "@vitejs/plugin-react": "6.0.2",
+    "esbuild": "0.28.0",
+    "jsdom": "29.1.1",
+    "tailwindcss": "4.3.0",
+    "typescript": "^5.9.3",
+    "vite": "8.0.14",
+    "vitest": "4.1.7"
+  }
+}

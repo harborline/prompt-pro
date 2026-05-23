@@ -1,0 +1,17 @@
+Prompt Producer keeps your reusable AI prompts close at hand.
+
+Build a local prompt library, edit prompts in a BlockNote-powered editor, and call up the command bar from anywhere on your Mac with a global hotkey. Search by title, body, or tag, preview the full prompt, then copy it or paste it into the app you were already using.
+
+Features:
+- Global command bar for fast prompt search
+- Menu bar access for saved prompts
+- BlockNote editor for writing and refining prompts
+- Local Fuse.js fuzzy search across titles, prompt bodies, and tags
+- Apple Foundation Models support for on-device prompt generation and revision
+- Prompt preview before copy or paste
+- Customizable hotkeys, theme, and enter-key behavior
+- Optional Dock and menu bar visibility controls
+
+Prompt Producer is designed for local workflows. Prompts are stored on your Mac, prompt search runs locally, and AI generation uses Apple Foundation Models on supported Macs. No account is required.
+
+Optional Accessibility and Automation permissions are used only when you ask Prompt Producer to paste a selected prompt into the app you were using. Copying prompts works without those permissions.

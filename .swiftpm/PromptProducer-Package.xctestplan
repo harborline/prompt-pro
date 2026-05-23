@@ -1,0 +1,29 @@
+{
+  "configurations" : [
+    {
+      "id" : "964483C2-1FE0-49A5-8F80-AF5034397190",
+      "name" : "Test Scheme Action",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "performanceAntipatternCheckerEnabled" : true,
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:",
+      "identifier" : "PromptProducer",
+      "name" : "PromptProducer"
+    }
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "PromptProducerCoreTests",
+        "name" : "PromptProducerCoreTests"
+      }
+    }
+  ],
+  "version" : 1
+}
