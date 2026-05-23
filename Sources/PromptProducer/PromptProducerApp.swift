@@ -8,6 +8,7 @@ struct PromptProducerApp: App {
     @StateObject private var coordinator: AppCoordinator
     @AppStorage(AppPreferenceKeys.theme) private var selectedTheme = AppTheme.system.rawValue
     @AppStorage(AppPreferenceKeys.hideMenuBarIcon) private var hideMenuBarIcon = false
+    @AppStorage(AppPreferenceKeys.keepWindowsOnTop) private var keepWindowsOnTop = false
 
     private var preferredColorScheme: ColorScheme? {
         AppTheme.resolved(from: selectedTheme).colorScheme
@@ -34,7 +35,8 @@ struct PromptProducerApp: App {
             MainLibrarySceneView(
                 model: model,
                 coordinator: coordinator,
-                preferredColorScheme: preferredColorScheme
+                preferredColorScheme: preferredColorScheme,
+                keepWindowsOnTop: keepWindowsOnTop
             )
         }
         .defaultSize(width: 980, height: 680)
@@ -65,7 +67,7 @@ struct PromptProducerApp: App {
             SettingsView(model: model, coordinator: coordinator)
                 .preferredColorScheme(preferredColorScheme)
                 .background(NordTheme.background)
-                .background(WindowChromeHider())
+                .background(WindowChromeHider(keepWindowsOnTop: keepWindowsOnTop))
         }
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentMinSize)
@@ -80,6 +82,7 @@ private struct MainLibrarySceneView: View {
     @ObservedObject var model: PromptLibraryModel
     @ObservedObject var coordinator: AppCoordinator
     let preferredColorScheme: ColorScheme?
+    let keepWindowsOnTop: Bool
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -88,7 +91,7 @@ private struct MainLibrarySceneView: View {
         }
         .preferredColorScheme(preferredColorScheme)
         .background(NordTheme.background.ignoresSafeArea())
-        .background(WindowChromeHider())
+        .background(WindowChromeHider(keepWindowsOnTop: keepWindowsOnTop))
         .tint(NordTheme.accent)
         .toolbar(.hidden, for: .windowToolbar)
         .frame(minWidth: 820, minHeight: 560)
@@ -100,6 +103,13 @@ private struct MainLibrarySceneView: View {
             coordinator.setOpenPromptLibraryWindowAction {
                 openWindow(id: "main")
             }
+            AppWindowLevelPreferences.applyToOpenWindows(keepWindowsOnTop: keepWindowsOnTop)
+            DispatchQueue.main.async {
+                AppWindowLevelPreferences.applyToOpenWindows(keepWindowsOnTop: keepWindowsOnTop)
+            }
+        }
+        .onChange(of: keepWindowsOnTop) { _, newValue in
+            AppWindowLevelPreferences.applyToOpenWindows(keepWindowsOnTop: newValue)
         }
     }
 
@@ -112,6 +122,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         AppLog.lifecycle.info("Prompt Producer launched")
         AppVisibilityPreferences.applyDockIconPreference()
+        AppWindowLevelPreferences.applyToOpenWindows()
         if !UserDefaults.standard.bool(forKey: AppPreferenceKeys.hideDockIcon) {
             NSApp.activate(ignoringOtherApps: true)
         }
@@ -123,15 +134,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 private struct WindowChromeHider: NSViewRepresentable {
+    var keepWindowsOnTop: Bool? = nil
+
     func makeNSView(context: Context) -> ChromeHidingView {
-        ChromeHidingView()
+        ChromeHidingView(keepWindowsOnTop: keepWindowsOnTop)
     }
 
     func updateNSView(_ nsView: ChromeHidingView, context: Context) {
+        nsView.keepWindowsOnTop = keepWindowsOnTop
         nsView.hideWindowChrome()
     }
 
     final class ChromeHidingView: NSView {
+        var keepWindowsOnTop: Bool?
+
+        init(keepWindowsOnTop: Bool?) {
+            self.keepWindowsOnTop = keepWindowsOnTop
+            super.init(frame: .zero)
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) {
+            fatalError("init(coder:) has not been implemented")
+        }
+
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
             hideWindowChrome()
@@ -143,6 +169,7 @@ private struct WindowChromeHider: NSViewRepresentable {
             }
 
             window.applyPromptProducerChrome()
+            AppWindowLevelPreferences.apply(to: window, keepWindowsOnTop: keepWindowsOnTop)
         }
     }
 }

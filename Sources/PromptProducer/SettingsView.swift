@@ -9,6 +9,7 @@ struct SettingsView: View {
     @AppStorage(AppPreferenceKeys.promptSelectionBehavior) private var promptSelectionBehavior = PromptSelectionBehavior.copyAndPaste.rawValue
     @AppStorage(AppPreferenceKeys.hideDockIcon) private var hideDockIcon = false
     @AppStorage(AppPreferenceKeys.hideMenuBarIcon) private var hideMenuBarIcon = false
+    @AppStorage(AppPreferenceKeys.keepWindowsOnTop) private var keepWindowsOnTop = false
     private let settingsWindowSize = NSSize(width: 420, height: 760)
 
     var body: some View {
@@ -24,6 +25,7 @@ struct SettingsView: View {
 
                     Toggle("Hide Dock icon", isOn: $hideDockIcon)
                     Toggle("Hide menu bar icon", isOn: $hideMenuBarIcon)
+                    Toggle("Keep windows on top", isOn: $keepWindowsOnTop)
                 }
 
                 Section("App Behavior") {
@@ -89,9 +91,15 @@ struct SettingsView: View {
         .toolbar(.hidden, for: .windowToolbar)
         .ignoresSafeArea(.container, edges: .top)
         .frame(width: settingsWindowSize.width, height: settingsWindowSize.height)
-        .background(SettingsWindowSizer(size: settingsWindowSize))
+        .background(SettingsWindowSizer(size: settingsWindowSize, keepWindowsOnTop: keepWindowsOnTop))
+        .onAppear {
+            AppWindowLevelPreferences.applyToOpenWindows(keepWindowsOnTop: keepWindowsOnTop)
+        }
         .onChange(of: hideDockIcon) { _, newValue in
             AppVisibilityPreferences.applyDockIconPreference(newValue)
+        }
+        .onChange(of: keepWindowsOnTop) { _, newValue in
+            AppWindowLevelPreferences.applyToOpenWindows(keepWindowsOnTop: newValue)
         }
     }
 }
@@ -151,6 +159,7 @@ private struct SettingsFooter: View {
 
 private struct SettingsWindowSizer: NSViewRepresentable {
     let size: NSSize
+    let keepWindowsOnTop: Bool
 
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
@@ -171,6 +180,7 @@ private struct SettingsWindowSizer: NSViewRepresentable {
             return
         }
 
+        AppWindowLevelPreferences.apply(to: window, keepWindowsOnTop: keepWindowsOnTop)
         window.minSize = size
         window.maxSize = NSSize(width: size.width, height: 1200)
 

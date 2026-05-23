@@ -166,6 +166,7 @@ final class AppCoordinator: NSObject, ObservableObject, NSWindowDelegate {
             }
         )
         panel.title = preview.title.isEmpty ? "Prompt Preview" : preview.title
+        AppWindowLevelPreferences.apply(to: panel)
         panel.center()
         panel.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
@@ -225,11 +226,12 @@ final class AppCoordinator: NSObject, ObservableObject, NSWindowDelegate {
             defer: false
         )
         panel.title = "Prompt Producer"
+        panel.identifier = AppWindowLevelPreferences.commandBarWindowIdentifier
         panel.isMovableByWindowBackground = true
         panel.isReleasedWhenClosed = false
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.level = .floating
+        AppWindowLevelPreferences.apply(to: panel)
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.contentView?.wantsLayer = true
         panel.contentView?.layer?.cornerRadius = NordTheme.commandBarWindowRadius
@@ -286,12 +288,13 @@ final class AppCoordinator: NSObject, ObservableObject, NSWindowDelegate {
             defer: false
         )
         panel.title = "Prompt Preview"
+        panel.identifier = AppWindowLevelPreferences.promptPreviewWindowIdentifier
         panel.applyPromptProducerChrome()
         panel.isMovableByWindowBackground = true
         panel.isReleasedWhenClosed = false
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.level = .floating
+        AppWindowLevelPreferences.apply(to: panel)
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.contentView?.wantsLayer = true
         panel.contentView?.layer?.cornerRadius = NordTheme.windowRadius

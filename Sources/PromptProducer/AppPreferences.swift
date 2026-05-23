@@ -9,6 +9,7 @@ enum AppPreferenceKeys {
     static let promptSelectionBehavior = "promptSelectionBehavior"
     static let hideDockIcon = "hideDockIcon"
     static let hideMenuBarIcon = "hideMenuBarIcon"
+    static let keepWindowsOnTop = "keepWindowsOnTop"
 }
 
 enum AppTheme: String, CaseIterable, Identifiable {
@@ -72,6 +73,39 @@ enum AppVisibilityPreferences {
 
     static func applyDockIconPreference(_ hidesDockIcon: Bool) {
         NSApp.setActivationPolicy(hidesDockIcon ? .accessory : .regular)
+    }
+}
+
+@MainActor
+enum AppWindowLevelPreferences {
+    static let commandBarWindowIdentifier = NSUserInterfaceItemIdentifier("commandBar")
+    static let promptPreviewWindowIdentifier = NSUserInterfaceItemIdentifier("promptPreview")
+
+    static func applyToOpenWindows(keepWindowsOnTop: Bool? = nil, defaults: UserDefaults = .standard) {
+        for window in NSApp.windows {
+            apply(to: window, keepWindowsOnTop: keepWindowsOnTop, defaults: defaults)
+        }
+    }
+
+    static func apply(to window: NSWindow, keepWindowsOnTop: Bool? = nil, defaults: UserDefaults = .standard) {
+        let shouldKeepOnTop = keepWindowsOnTop ?? defaults.bool(forKey: AppPreferenceKeys.keepWindowsOnTop)
+        let level = shouldKeepOnTop
+            ? .floating
+            : defaultLevel(for: window)
+        window.level = level
+
+        DispatchQueue.main.async { [weak window] in
+            window?.level = level
+        }
+    }
+
+    private static func defaultLevel(for window: NSWindow) -> NSWindow.Level {
+        switch window.identifier {
+        case commandBarWindowIdentifier, promptPreviewWindowIdentifier:
+            return .floating
+        default:
+            return .normal
+        }
     }
 }
 

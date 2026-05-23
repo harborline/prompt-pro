@@ -46,10 +46,15 @@ mkdir -p "$APP_MACOS" "$APP_RESOURCES" "$APP_FRAMEWORKS"
 cp "$BUILD_BINARY" "$APP_BINARY"
 chmod +x "$APP_BINARY"
 
+find "$BUILD_BIN_DIR" -maxdepth 1 -type d -name "*.bundle" -print0 | while IFS= read -r -d '' resource_bundle; do
+  bundle_name="$(basename "$resource_bundle")"
+  rm -rf "$APP_RESOURCES/$bundle_name"
+  cp -R "$resource_bundle" "$APP_RESOURCES/"
+done
+
 if [[ -d "$RESOURCE_BUNDLE/BlockNoteEditor" ]]; then
+  rm -rf "$APP_RESOURCES/BlockNoteEditor"
   cp -R "$RESOURCE_BUNDLE/BlockNoteEditor" "$APP_RESOURCES/"
-elif [[ -d "$RESOURCE_BUNDLE" ]]; then
-  cp -R "$RESOURCE_BUNDLE" "$APP_RESOURCES/"
 fi
 
 if [[ ! -f "$APP_ICON_SOURCE" ]]; then
