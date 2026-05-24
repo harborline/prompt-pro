@@ -16,11 +16,7 @@ platform :mac do
       next File.expand_path(ENV.fetch("PROMPT_PRODUCER_PREBUILT_PKG"))
     end
 
-    UI.user_error!(
-      "Set PROMPT_PRODUCER_PREBUILT_PKG to a locally signed pkg. " \
-      "Use ./script/package_app_store.sh --prepare to build the signed app bundle first, " \
-      "then copy it to a clean package source before running productbuild."
-    )
+    sh("cd #{ROOT} && /bin/zsh ./script/package_app_store.sh --package").lines.last.strip
   end
 
   desc "Upload Prompt Producer App Privacy answers"
