@@ -53,16 +53,45 @@ teardown_xattr_spy() {
     rm -f "$XATTR_LOG" "$MOCK_XATTR_BIN"
 }
 
-# Run the post-PR purge_bundle_metadata loop body against a given path using
-# run_purge_loop_body invokes the provided xattr binary to clear all extended attributes on a path, using "-c -s" when the path is a symbolic link and "-c" otherwise.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+PRODUCTION_SCRIPT="$SCRIPT_DIR/script/package_app_store.sh"
+
+# run_purge_loop_body invokes the actual production purge_bundle_metadata loop
+# body from package_app_store.sh against a test file, using the mock xattr.
+# This creates a temporary bundle, calls the real production function, and
+# asserts the observable side effects (xattr calls logged via the mock).
 run_purge_loop_body() {
     local bundled_path="$1"
     local mock_xattr="$2"
+
+    # Create a minimal test bundle containing just our test file
+    local test_bundle
+    test_bundle="$(mktemp -d)"
+
+    # Preserve file type (symlink vs regular) when copying to test bundle
     if [[ -L "$bundled_path" ]]; then
-        "$mock_xattr" -c -s "$bundled_path" 2>/dev/null || true
+        cp -P "$bundled_path" "$test_bundle/testfile"
     else
-        "$mock_xattr" -c "$bundled_path" 2>/dev/null || true
+        cp "$bundled_path" "$test_bundle/testfile"
     fi
+
+    # Invoke production script's purge_bundle_metadata with mocked xattr.
+    # Create a wrapper script that patches /usr/bin/xattr path in the heredoc.
+    local modified_script
+    modified_script="$(mktemp)"
+
+    # Extract and modify the production function to use our mock xattr
+    sed -n '/^purge_bundle_metadata()/,/^}/p' "$PRODUCTION_SCRIPT" | \
+        sed "s|/usr/bin/xattr|$mock_xattr|g" > "$modified_script"
+
+    # Source the modified function and execute it
+    (
+        source "$modified_script"
+        purge_bundle_metadata "$test_bundle"
+    ) 2>/dev/null || true
+
+    rm -f "$modified_script"
+    rm -rf "$test_bundle"
 }
 
 # ===========================================================================

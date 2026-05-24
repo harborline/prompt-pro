@@ -29,57 +29,93 @@ run_subshell() {
 #
 # :? causes the shell to exit with an error message when the variable is unset
 # or empty, preventing a dangerous rm -rf with an empty path component.
+#
+# Tests now source and invoke the actual production script logic to ensure
+# the test reflects real behavior and catches regressions.
 # ===========================================================================
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+PRODUCTION_SCRIPT="$SCRIPT_DIR/script/build_and_run.sh"
+
+# Extract the actual rm -rf line with :? expansion from the production script.
+# This line is: rm -rf "${APP_RESOURCES:?}/${bundle_name:?}"
+PRODUCTION_RM_LINE="$(grep -F '${APP_RESOURCES:?}/${bundle_name:?}' "$PRODUCTION_SCRIPT" | head -n 1)"
+
+# test_parameter_expansion_guard executes the actual production script line
+# that uses :? expansion with the provided environment variables. It extracts
+# just the parameter expansion for testing without side effects.
+test_parameter_expansion_guard() {
+    local app_resources="$1"
+    local bundle_name_val="$2"
+    (
+        if [[ "$app_resources" == "UNSET" ]]; then
+            unset APP_RESOURCES
+        else
+            APP_RESOURCES="$app_resources"
+        fi
+
+        if [[ "$bundle_name_val" == "UNSET" ]]; then
+            unset bundle_name
+        else
+            bundle_name="$bundle_name_val"
+        fi
+
+        # Execute just the parameter expansion part from the production script
+        # without the rm -rf side effect
+        eval ": ${PRODUCTION_RM_LINE#*rm -rf }"
+    ) 2>/dev/null
+}
+
+# test_path_construction evaluates the actual path construction from the
+# production script using the same :? expansion syntax.
+test_path_construction() {
+    local app_resources="$1"
+    local bundle_name_val="$2"
+    (
+        APP_RESOURCES="$app_resources"
+        bundle_name="$bundle_name_val"
+        # Extract and evaluate the path expression from production
+        eval "echo ${PRODUCTION_RM_LINE#*rm -rf }"
+    ) 2>/dev/null
+}
+
 # 1a. When APP_RESOURCES is empty the expansion should fail.
-snippet_empty_app_resources='APP_RESOURCES="" bundle_name="foo.bundle"
-: "${APP_RESOURCES:?}" "${bundle_name:?}"'
-if run_subshell "$snippet_empty_app_resources"; then
+if test_parameter_expansion_guard "" "foo.bundle"; then
     fail "empty APP_RESOURCES should trigger :? expansion failure"
 else
     pass "empty APP_RESOURCES triggers :? expansion failure"
 fi
 
 # 1b. When bundle_name is empty the expansion should fail.
-snippet_empty_bundle_name='APP_RESOURCES="/some/resources" bundle_name=""
-: "${APP_RESOURCES:?}" "${bundle_name:?}"'
-if run_subshell "$snippet_empty_bundle_name"; then
+if test_parameter_expansion_guard "/some/resources" ""; then
     fail "empty bundle_name should trigger :? expansion failure"
 else
     pass "empty bundle_name triggers :? expansion failure"
 fi
 
 # 1c. When APP_RESOURCES is unset the expansion should fail.
-snippet_unset_app_resources='unset APP_RESOURCES; bundle_name="foo.bundle"
-: "${APP_RESOURCES:?}" "${bundle_name:?}"'
-if run_subshell "$snippet_unset_app_resources"; then
+if test_parameter_expansion_guard "UNSET" "foo.bundle"; then
     fail "unset APP_RESOURCES should trigger :? expansion failure"
 else
     pass "unset APP_RESOURCES triggers :? expansion failure"
 fi
 
 # 1d. When bundle_name is unset the expansion should fail.
-snippet_unset_bundle_name='APP_RESOURCES="/some/resources"; unset bundle_name
-: "${APP_RESOURCES:?}" "${bundle_name:?}"'
-if run_subshell "$snippet_unset_bundle_name"; then
+if test_parameter_expansion_guard "/some/resources" "UNSET"; then
     fail "unset bundle_name should trigger :? expansion failure"
 else
     pass "unset bundle_name triggers :? expansion failure"
 fi
 
 # 1e. When both variables are set to non-empty values the expansion succeeds.
-snippet_both_set='APP_RESOURCES="/some/resources" bundle_name="foo.bundle"
-: "${APP_RESOURCES:?}" "${bundle_name:?}"'
-if run_subshell "$snippet_both_set"; then
+if test_parameter_expansion_guard "/some/resources" "foo.bundle"; then
     pass "both variables set: :? expansion succeeds"
 else
     fail "both variables set: :? expansion should succeed"
 fi
 
 # 1f. Verify the constructed path is exactly APP_RESOURCES/bundle_name (no double slashes).
-snippet_path_value='APP_RESOURCES="/a/b" bundle_name="c.bundle"
-echo "${APP_RESOURCES:?}/${bundle_name:?}"'
-result="$(run_subshell "$snippet_path_value" 2>/dev/null)"
+result="$(test_path_construction "/a/b" "c.bundle")"
 expected="/a/b/c.bundle"
 if [[ "$result" == "$expected" ]]; then
     pass ":? expansion builds the expected path"
