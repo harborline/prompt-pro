@@ -52,10 +52,8 @@ chmod -R u+w "$BUNDLE_PATH" 2>/dev/null || true
 while IFS= read -r -d '' bundled_path; do
   if [[ -L "$bundled_path" ]]; then
     /usr/bin/xattr -c -s "$bundled_path" 2>/dev/null || true
-    /usr/bin/xattr -d -s "com.apple.provenance" "$bundled_path" 2>/dev/null || true
   else
     /usr/bin/xattr -c "$bundled_path" 2>/dev/null || true
-    /usr/bin/xattr -d "com.apple.provenance" "$bundled_path" 2>/dev/null || true
   fi
 done < <(/usr/bin/find "$BUNDLE_PATH" -print0)
 CLEAN_METADATA

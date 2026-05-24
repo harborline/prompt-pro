@@ -94,6 +94,7 @@ enum AppWindowLevelPreferences {
             : defaultLevel(for: window)
         window.level = level
 
+        // AppKit can reset levels while restoring or creating windows, so reapply once on the next run loop.
         DispatchQueue.main.async { [weak window] in
             window?.level = level
         }
