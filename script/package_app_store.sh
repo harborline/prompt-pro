@@ -142,16 +142,22 @@ assert_bundle_metadata_free() {
 
 prepare_app_bundle() {
   local app_bundle
+  local build_output="$BUILD_DIR/build-and-run.log"
 
-  app_bundle="$(
+  if ! (
     PROMPT_PRODUCER_DIST_DIR="$APP_BUNDLE_DIR" \
     PROMPT_PRODUCER_VERSION="$VERSION" \
     PROMPT_PRODUCER_BUILD_NUMBER="$BUILD_NUMBER" \
     PROMPT_PRODUCER_CODE_SIGN_STYLE="Manual" \
     PROMPT_PRODUCER_CODE_SIGN_IDENTITY="$APP_SIGNING_IDENTITY" \
     PROMPT_PRODUCER_CODE_SIGN_ENTITLEMENTS="$ROOT_DIR/Distribution/AppStore.entitlements" \
-    "$ROOT_DIR/script/build_and_run.sh" package | tail -n 1
-  )"
+    "$ROOT_DIR/script/build_and_run.sh" package
+  ) >"$build_output" 2>&1; then
+    cat "$build_output" >&2
+    exit 1
+  fi
+
+  app_bundle="$(tail -n 1 "$build_output")"
 
   if [[ ! -d "$app_bundle" ]]; then
     echo "App bundle was not created: $app_bundle" >&2
@@ -179,7 +185,7 @@ prepare_app_bundle() {
   purge_bundle_metadata "$app_bundle"
   codesign --verify --deep --strict --verbose=2 "$app_bundle"
 
-  echo "$app_bundle"
+  PREPARED_APP_BUNDLE="$app_bundle"
 }
 
 assert_package_is_store_clean() {
@@ -271,7 +277,8 @@ package_payload_symlinks_resolve() {
 build_package() {
   local app_bundle
 
-  app_bundle="$(prepare_app_bundle)"
+  prepare_app_bundle
+  app_bundle="$PREPARED_APP_BUNDLE"
 
   rm -rf "$PACKAGE_ROOT" "$PKG_PATH"
   mkdir -p "$PACKAGE_ROOT"
@@ -295,6 +302,7 @@ build_package() {
 case "$MODE" in
   --prepare|prepare)
     prepare_app_bundle
+    echo "$PREPARED_APP_BUNDLE"
     ;;
   --package|package)
     build_package

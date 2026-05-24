@@ -31,6 +31,7 @@ platform :mac do
   desc "Upload Prompt Producer and submit it for Mac App Store review"
   lane :submit_review do
     skip_binary_upload = ENV["PROMPT_PRODUCER_SKIP_BINARY_UPLOAD"] == "1"
+    upload_only = ENV["PROMPT_PRODUCER_UPLOAD_ONLY"] == "1"
     target_build_number = ENV["PROMPT_PRODUCER_BUILD_NUMBER"].to_s.strip
     if skip_binary_upload && target_build_number.empty?
       UI.user_error!("PROMPT_PRODUCER_BUILD_NUMBER is required when PROMPT_PRODUCER_SKIP_BINARY_UPLOAD=1")
@@ -64,7 +65,7 @@ platform :mac do
       skip_screenshots: ENV["PROMPT_PRODUCER_SKIP_SCREENSHOTS"] == "1",
       overwrite_screenshots: ENV["PROMPT_PRODUCER_SKIP_SCREENSHOTS"] != "1",
       skip_binary_upload: skip_binary_upload,
-      submit_for_review: true,
+      submit_for_review: !upload_only,
       reject_if_possible: true,
       automatic_release: false,
       force: true,
@@ -82,7 +83,7 @@ platform :mac do
         add_id_info_uses_idfa: false
       }
     }
-    deliver_options[:build_number] = target_build_number unless target_build_number.empty?
+    deliver_options[:build_number] = target_build_number if skip_binary_upload && !target_build_number.empty?
 
     deliver(deliver_options)
   end

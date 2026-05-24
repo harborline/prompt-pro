@@ -69,44 +69,44 @@ find "$BUILD_BIN_DIR" -maxdepth 1 \( -name "*.framework" -o -name "*.dylib" \) -
   cp -R "$dependency" "$APP_FRAMEWORKS/"
 done
 
-cat >"$INFO_PLIST" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>CFBundleExecutable</key>
-  <string>$EXECUTABLE_NAME</string>
-  <key>CFBundleIdentifier</key>
-  <string>$BUNDLE_ID</string>
-  <key>CFBundleName</key>
-  <string>$APP_NAME</string>
-  <key>CFBundleDisplayName</key>
-  <string>$APP_NAME</string>
-  <key>CFBundleIconFile</key>
-  <string>AppIcon</string>
-  <key>CFBundlePackageType</key>
-  <string>APPL</string>
-  <key>CFBundleShortVersionString</key>
-  <string>$VERSION</string>
-  <key>CFBundleVersion</key>
-  <string>$BUILD_NUMBER</string>
-  <key>LSApplicationCategoryType</key>
-  <string>public.app-category.productivity</string>
-  <key>LSMinimumSystemVersion</key>
-  <string>$MIN_SYSTEM_VERSION</string>
-  <key>NSHighResolutionCapable</key>
-  <true/>
-  <key>NSPrincipalClass</key>
-  <string>NSApplication</string>
-  <key>NSAppleEventsUsageDescription</key>
-  <string>Prompt Producer can paste a selected prompt into the app you were using when you ask it to.</string>
-  <key>NSAccessibilityUsageDescription</key>
-  <string>Prompt Producer uses accessibility access only to paste a selected prompt into the active text field when requested.</string>
-  <key>ITSAppUsesNonExemptEncryption</key>
-  <false/>
-</dict>
-</plist>
-PLIST
+{
+  printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>'
+  printf '%s\n' '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">'
+  printf '%s\n' '<plist version="1.0">'
+  printf '%s\n' '<dict>'
+  printf '%s\n' '  <key>CFBundleExecutable</key>'
+  printf '  <string>%s</string>\n' "$EXECUTABLE_NAME"
+  printf '%s\n' '  <key>CFBundleIdentifier</key>'
+  printf '  <string>%s</string>\n' "$BUNDLE_ID"
+  printf '%s\n' '  <key>CFBundleName</key>'
+  printf '  <string>%s</string>\n' "$APP_NAME"
+  printf '%s\n' '  <key>CFBundleDisplayName</key>'
+  printf '  <string>%s</string>\n' "$APP_NAME"
+  printf '%s\n' '  <key>CFBundleIconFile</key>'
+  printf '%s\n' '  <string>AppIcon</string>'
+  printf '%s\n' '  <key>CFBundlePackageType</key>'
+  printf '%s\n' '  <string>APPL</string>'
+  printf '%s\n' '  <key>CFBundleShortVersionString</key>'
+  printf '  <string>%s</string>\n' "$VERSION"
+  printf '%s\n' '  <key>CFBundleVersion</key>'
+  printf '  <string>%s</string>\n' "$BUILD_NUMBER"
+  printf '%s\n' '  <key>LSApplicationCategoryType</key>'
+  printf '%s\n' '  <string>public.app-category.productivity</string>'
+  printf '%s\n' '  <key>LSMinimumSystemVersion</key>'
+  printf '  <string>%s</string>\n' "$MIN_SYSTEM_VERSION"
+  printf '%s\n' '  <key>NSHighResolutionCapable</key>'
+  printf '%s\n' '  <true/>'
+  printf '%s\n' '  <key>NSPrincipalClass</key>'
+  printf '%s\n' '  <string>NSApplication</string>'
+  printf '%s\n' '  <key>NSAppleEventsUsageDescription</key>'
+  printf '%s\n' '  <string>Prompt Producer can paste a selected prompt into the app you were using when you ask it to.</string>'
+  printf '%s\n' '  <key>NSAccessibilityUsageDescription</key>'
+  printf '%s\n' '  <string>Prompt Producer uses accessibility access only to paste a selected prompt into the active text field when requested.</string>'
+  printf '%s\n' '  <key>ITSAppUsesNonExemptEncryption</key>'
+  printf '%s\n' '  <false/>'
+  printf '%s\n' '</dict>'
+  printf '%s\n' '</plist>'
+} >"$INFO_PLIST"
 
 if [[ -n "$SENTRY_DSN" ]]; then
   /usr/libexec/PlistBuddy -c "Add :SentryDSN string $SENTRY_DSN" "$INFO_PLIST" >/dev/null
