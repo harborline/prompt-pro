@@ -1,224 +1,97 @@
 #!/usr/bin/env bash
-# Tests for changes introduced in script/package_app_store.sh
-#
-# The PR removed two redundant xattr -d calls from the purge_bundle_metadata
-# function.  Before the change the loop body was:
-#
-#   if [[ -L "$bundled_path" ]]; then
-#       /usr/bin/xattr -c -s "$bundled_path"  2>/dev/null || true
-#       /usr/bin/xattr -d -s "com.apple.provenance" "$bundled_path" 2>/dev/null || true  # REMOVED
-#   else
-#       /usr/bin/xattr -c "$bundled_path"  2>/dev/null || true
-#       /usr/bin/xattr -d "com.apple.provenance" "$bundled_path" 2>/dev/null || true  # REMOVED
-#   fi
-#
-# After the change only `xattr -c [-s]` is invoked; the separate
-# `xattr -d com.apple.provenance` lines are gone because `xattr -c` already
-# clears every extended attribute on the file.
-set -uo pipefail
+set -euo pipefail
 
 PASS=0
 FAIL=0
 
-# pass echoes a PASS message prefixed with "PASS: " for the given text and increments the global PASS counter.
-pass() { echo "PASS: $1"; PASS=$((PASS + 1)); }
-# fail echoes a failure message prefixed with 'FAIL:' and increments the FAIL counter.
-fail() { echo "FAIL: $1"; FAIL=$((FAIL + 1)); }
+pass() {
+    echo "PASS: $1"
+    PASS=$((PASS + 1))
+}
 
-# ---------------------------------------------------------------------------
-# Spy infrastructure
-#
-# We replace /usr/bin/xattr with a wrapper that records every invocation into
-# a temporary log file so tests can assert which flags were (or were not) used.
-# ---------------------------------------------------------------------------
+fail() {
+    echo "FAIL: $1"
+    FAIL=$((FAIL + 1))
+}
+
 XATTR_LOG=""
+MOCK_XATTR_BIN=""
 
-# setup_xattr_spy creates a temporary XATTR_LOG and a mock xattr executable that appends each invocation's arguments to the log and exits successfully.
 setup_xattr_spy() {
     XATTR_LOG="$(mktemp)"
-    # Create a mock xattr that logs calls and succeeds.
-    mock_xattr_bin="$(mktemp)"
-    cat >"$mock_xattr_bin" <<'MOCK'
+    MOCK_XATTR_BIN="$(mktemp)"
+    cat >"$MOCK_XATTR_BIN" <<'MOCK'
 #!/usr/bin/env bash
 echo "$*" >> "$XATTR_LOG"
 exit 0
 MOCK
-    chmod +x "$mock_xattr_bin"
-    MOCK_XATTR_BIN="$mock_xattr_bin"
+    chmod +x "$MOCK_XATTR_BIN"
     export XATTR_LOG
 }
 
-# teardown_xattr_spy removes the temporary xattr invocation log file and the mock xattr executable.
 teardown_xattr_spy() {
     rm -f "$XATTR_LOG" "$MOCK_XATTR_BIN"
 }
 
-# Run the post-PR purge_bundle_metadata loop body against a given path using
-# run_purge_loop_body invokes the provided xattr binary to clear all extended attributes on a path, using "-c -s" when the path is a symbolic link and "-c" otherwise.
 run_purge_loop_body() {
     local bundled_path="$1"
-    local mock_xattr="$2"
+    local xattr_bin="$2"
+
     if [[ -L "$bundled_path" ]]; then
-        "$mock_xattr" -c -s "$bundled_path" 2>/dev/null || true
+        "$xattr_bin" -c -s "$bundled_path" 2>/dev/null || true
+        "$xattr_bin" -d -s "com.apple.provenance" "$bundled_path" 2>/dev/null || true
     else
-        "$mock_xattr" -c "$bundled_path" 2>/dev/null || true
+        "$xattr_bin" -c "$bundled_path" 2>/dev/null || true
+        "$xattr_bin" -d "com.apple.provenance" "$bundled_path" 2>/dev/null || true
     fi
 }
 
-# ===========================================================================
-# Section 1: Regular files — only xattr -c, no xattr -d com.apple.provenance
-# ===========================================================================
+assert_log_matches() {
+    local expected="$1"
+    local message="$2"
 
-# 1a. xattr -c is called for a regular file.
+    if grep -Eq "$expected" "$XATTR_LOG" 2>/dev/null; then
+        pass "$message"
+    else
+        fail "$message (missing pattern: $expected)"
+    fi
+}
+
+assert_call_count() {
+    local expected="$1"
+    local message="$2"
+    local count
+
+    count="$(wc -l < "$XATTR_LOG" | tr -d ' ')"
+    if [[ "$count" -eq "$expected" ]]; then
+        pass "$message"
+    else
+        fail "$message (expected $expected calls, got $count)"
+    fi
+}
+
 setup_xattr_spy
 tmpfile="$(mktemp)"
 run_purge_loop_body "$tmpfile" "$MOCK_XATTR_BIN"
-if grep -q "\-c " "$XATTR_LOG" 2>/dev/null || grep -q "^-c " "$XATTR_LOG" 2>/dev/null; then
-    pass "regular file: xattr -c is invoked"
-else
-    fail "regular file: xattr -c was not invoked"
-fi
+assert_log_matches '^-c ' "regular file: xattr -c is invoked"
+assert_log_matches '^-d com\.apple\.provenance ' "regular file: provenance is explicitly removed"
+assert_call_count 2 "regular file: exactly two xattr calls are made"
 teardown_xattr_spy
 rm -f "$tmpfile"
 
-# 1b. xattr -d com.apple.provenance is NOT called for a regular file.
 setup_xattr_spy
-tmpfile="$(mktemp)"
-run_purge_loop_body "$tmpfile" "$MOCK_XATTR_BIN"
-if grep -q "com.apple.provenance" "$XATTR_LOG" 2>/dev/null; then
-    fail "regular file: xattr -d com.apple.provenance should not be called (it was removed as redundant)"
-else
-    pass "regular file: xattr -d com.apple.provenance is not called after removal"
-fi
-teardown_xattr_spy
-rm -f "$tmpfile"
-
-# 1c. xattr -d (in any form) is not called for a regular file.
-setup_xattr_spy
-tmpfile="$(mktemp)"
-run_purge_loop_body "$tmpfile" "$MOCK_XATTR_BIN"
-if grep -qE "(^| )-d( |$)" "$XATTR_LOG" 2>/dev/null; then
-    fail "regular file: xattr -d should not be invoked at all after the change"
-else
-    pass "regular file: xattr -d is never called"
-fi
-teardown_xattr_spy
-rm -f "$tmpfile"
-
-# 1d. Exactly one xattr call is made for a regular file (not two as before).
-setup_xattr_spy
-tmpfile="$(mktemp)"
-run_purge_loop_body "$tmpfile" "$MOCK_XATTR_BIN"
-call_count="$(wc -l < "$XATTR_LOG" | tr -d ' ')"
-if [[ "$call_count" -eq 1 ]]; then
-    pass "regular file: exactly one xattr call is made"
-else
-    fail "regular file: expected 1 xattr call, got $call_count"
-fi
-teardown_xattr_spy
-rm -f "$tmpfile"
-
-# ===========================================================================
-# Section 2: Symbolic links — only xattr -c -s, no xattr -d -s com.apple.provenance
-# ===========================================================================
-
-# 2a. xattr -c -s is called for a symlink.
-setup_xattr_spy
-tmpfile="$(mktemp)"
-tmplink="$(mktemp -u)_link"
+link_tmpdir="$(mktemp -d)"
+tmpfile="$link_tmpdir/target"
+tmplink="$link_tmpdir/link"
+touch "$tmpfile"
 ln -s "$tmpfile" "$tmplink"
 run_purge_loop_body "$tmplink" "$MOCK_XATTR_BIN"
-if grep -q "\-c" "$XATTR_LOG" 2>/dev/null && grep -q "\-s" "$XATTR_LOG" 2>/dev/null; then
-    pass "symlink: xattr -c -s is invoked"
-else
-    fail "symlink: xattr -c -s was not invoked"
-fi
+assert_log_matches '^-c -s ' "symlink: xattr -c -s is invoked"
+assert_log_matches '^-d -s com\.apple\.provenance ' "symlink: provenance is explicitly removed with -s"
+assert_call_count 2 "symlink: exactly two xattr calls are made"
 teardown_xattr_spy
-rm -f "$tmpfile" "$tmplink"
+rm -rf "$link_tmpdir"
 
-# 2b. xattr -d com.apple.provenance is NOT called for a symlink.
-setup_xattr_spy
-tmpfile="$(mktemp)"
-tmplink="$(mktemp -u)_link2"
-ln -s "$tmpfile" "$tmplink"
-run_purge_loop_body "$tmplink" "$MOCK_XATTR_BIN"
-if grep -q "com.apple.provenance" "$XATTR_LOG" 2>/dev/null; then
-    fail "symlink: xattr -d com.apple.provenance should not be called (it was removed as redundant)"
-else
-    pass "symlink: xattr -d com.apple.provenance is not called after removal"
-fi
-teardown_xattr_spy
-rm -f "$tmpfile" "$tmplink"
-
-# 2c. xattr -d (in any form) is not called for a symlink.
-setup_xattr_spy
-tmpfile="$(mktemp)"
-tmplink="$(mktemp -u)_link3"
-ln -s "$tmpfile" "$tmplink"
-run_purge_loop_body "$tmplink" "$MOCK_XATTR_BIN"
-if grep -qE "(^| )-d( |$)" "$XATTR_LOG" 2>/dev/null; then
-    fail "symlink: xattr -d should not be invoked at all after the change"
-else
-    pass "symlink: xattr -d is never called"
-fi
-teardown_xattr_spy
-rm -f "$tmpfile" "$tmplink"
-
-# 2d. Exactly one xattr call is made for a symlink (not two as before).
-setup_xattr_spy
-tmpfile="$(mktemp)"
-tmplink="$(mktemp -u)_link4"
-ln -s "$tmpfile" "$tmplink"
-run_purge_loop_body "$tmplink" "$MOCK_XATTR_BIN"
-call_count="$(wc -l < "$XATTR_LOG" | tr -d ' ')"
-if [[ "$call_count" -eq 1 ]]; then
-    pass "symlink: exactly one xattr call is made"
-else
-    fail "symlink: expected 1 xattr call, got $call_count"
-fi
-teardown_xattr_spy
-rm -f "$tmpfile" "$tmplink"
-
-# ===========================================================================
-# Section 3: Routing — symlinks and regular files take different code paths
-# ===========================================================================
-
-# 3a. Regular file is NOT treated as a symlink (does not use -s flag).
-setup_xattr_spy
-tmpfile="$(mktemp)"
-run_purge_loop_body "$tmpfile" "$MOCK_XATTR_BIN"
-if grep -q "\-s" "$XATTR_LOG" 2>/dev/null; then
-    fail "regular file should not receive the -s (symlink) flag"
-else
-    pass "regular file: symlink flag -s is not used"
-fi
-teardown_xattr_spy
-rm -f "$tmpfile"
-
-# 3b. Symlink uses the -s flag (to operate on the link itself, not the target).
-setup_xattr_spy
-tmpfile="$(mktemp)"
-tmplink="$(mktemp -u)_link5"
-ln -s "$tmpfile" "$tmplink"
-run_purge_loop_body "$tmplink" "$MOCK_XATTR_BIN"
-if grep -q "\-s" "$XATTR_LOG" 2>/dev/null; then
-    pass "symlink: -s flag is used so xattr acts on the link itself"
-else
-    fail "symlink should receive the -s flag"
-fi
-teardown_xattr_spy
-rm -f "$tmpfile" "$tmplink"
-
-# ===========================================================================
-# Section 4: Regression — verify xattr -c clears all attributes
-#
-# On platforms where xattr is available (macOS), xattr -c removes every
-# extended attribute, making a separate xattr -d for com.apple.provenance
-# unnecessary.  This test verifies the claim using real xattr when possible,
-# and documents the expected behaviour on platforms that lack it.
-# ===========================================================================
-
-# 4a. If real xattr is available, verify that -c removes com.apple.provenance.
 XATTR_BIN=""
 for candidate in /usr/bin/xattr xattr; do
     if command -v "$candidate" >/dev/null 2>&1; then
@@ -229,26 +102,22 @@ done
 
 if [[ -n "$XATTR_BIN" ]]; then
     tmpfile="$(mktemp)"
-    # Set a dummy attribute if supported; xattr -w needs a value string.
-    if "$XATTR_BIN" -w "com.apple.provenance" "test" "$tmpfile" 2>/dev/null; then
+    if "$XATTR_BIN" -w "software.pdx.promptproducer.test" "test" "$tmpfile" 2>/dev/null; then
         "$XATTR_BIN" -c "$tmpfile" 2>/dev/null || true
         remaining="$("$XATTR_BIN" -l "$tmpfile" 2>/dev/null || true)"
-        if [[ -z "$remaining" ]]; then
-            pass "regression: xattr -c clears com.apple.provenance without a separate -d call"
+        if ! grep -Fq "software.pdx.promptproducer.test" <<<"$remaining"; then
+            pass "live regression: xattr -c clears ordinary extended attributes"
         else
-            fail "regression: xattr -c did not clear all attributes (remaining: $remaining)"
+            fail "live regression: ordinary test attribute remains after cleanup ($remaining)"
         fi
     else
-        pass "regression: xattr -w not supported on this platform; skipping live attribute test"
+        pass "live regression: xattr -w not supported; skipping live attribute test"
     fi
     rm -f "$tmpfile"
 else
-    pass "regression: xattr not available on this platform; live attribute test skipped"
+    pass "live regression: xattr unavailable; skipping live attribute test"
 fi
 
-# ===========================================================================
-# Summary
-# ===========================================================================
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [[ "$FAIL" -eq 0 ]]

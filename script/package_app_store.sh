@@ -40,7 +40,9 @@ resolve_identity() {
 APP_SIGNING_IDENTITY="$(resolve_identity "$APP_SIGNING_IDENTITY_REQUEST" codesigning)"
 INSTALLER_SIGNING_IDENTITY="$(resolve_identity "$INSTALLER_SIGNING_IDENTITY_REQUEST")"
 
-# purge_bundle_metadata removes common macOS metadata files (e.g. ._*, .DS_Store), makes bundle contents writable, and clears all extended attributes (using symlink-safe clearing for symlinks) for every file under the specified bundle directory.
+# purge_bundle_metadata removes common macOS metadata files, makes bundle contents writable,
+# and clears extended attributes. com.apple.provenance can survive broad xattr
+# clears in this packaging path, so attempt targeted deletion after xattr -c.
 purge_bundle_metadata() {
   local bundle_path="$1"
 
@@ -53,8 +55,10 @@ chmod -R u+w "$BUNDLE_PATH" 2>/dev/null || true
 while IFS= read -r -d '' bundled_path; do
   if [[ -L "$bundled_path" ]]; then
     /usr/bin/xattr -c -s "$bundled_path" 2>/dev/null || true
+    /usr/bin/xattr -d -s "com.apple.provenance" "$bundled_path" 2>/dev/null || true
   else
     /usr/bin/xattr -c "$bundled_path" 2>/dev/null || true
+    /usr/bin/xattr -d "com.apple.provenance" "$bundled_path" 2>/dev/null || true
   fi
 done < <(/usr/bin/find "$BUNDLE_PATH" -print0)
 CLEAN_METADATA
