@@ -105,7 +105,7 @@ if [[ -n "$XATTR_BIN" ]]; then
     if "$XATTR_BIN" -w "software.pdx.promptproducer.test" "test" "$tmpfile" 2>/dev/null; then
         "$XATTR_BIN" -c "$tmpfile" 2>/dev/null || true
         remaining="$("$XATTR_BIN" -l "$tmpfile" 2>/dev/null || true)"
-        if ! grep -q "software.pdx.promptproducer.test" <<<"$remaining"; then
+        if ! grep -Fq "software.pdx.promptproducer.test" <<<"$remaining"; then
             pass "live regression: xattr -c clears ordinary extended attributes"
         else
             fail "live regression: ordinary test attribute remains after cleanup ($remaining)"
