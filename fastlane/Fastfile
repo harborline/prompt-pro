@@ -31,6 +31,11 @@ platform :mac do
   desc "Upload Prompt Producer and submit it for Mac App Store review"
   lane :submit_review do
     skip_binary_upload = ENV["PROMPT_PRODUCER_SKIP_BINARY_UPLOAD"] == "1"
+    target_build_number = ENV["PROMPT_PRODUCER_BUILD_NUMBER"].to_s.strip
+    if skip_binary_upload && target_build_number.empty?
+      UI.user_error!("PROMPT_PRODUCER_BUILD_NUMBER is required when PROMPT_PRODUCER_SKIP_BINARY_UPLOAD=1")
+    end
+
     pkg_path = skip_binary_upload ? nil : package
 
     review_information = {
@@ -41,7 +46,7 @@ platform :mac do
       notes: "Prompt Producer does not require an account or subscription. To test: open the app, create or edit a saved prompt in the prompt library, use the AI button in the editor on macOS 26 or newer with Apple Foundation Models available, and press Command-Shift-U to open the global command bar. The command bar can copy a selected prompt; if Accessibility and Automation permissions are granted, Enter can also paste the prompt into the previously active text field. Prompt search uses local Fuse.js fuzzy search across titles, bodies, and tags. AI generation uses Apple on-device Foundation Models. Prompts are stored locally. No in-app purchases are included."
     }
 
-    deliver(
+    deliver_options = {
       api_key: app_store_connect_api_key(
         key_id: sh("doppler secrets get APP_STORE_CONNECT_KEY_ID --plain --project quickapp --config dev", log: false).strip,
         issuer_id: sh("doppler secrets get APP_STORE_CONNECT_ISSUER_ID --plain --project quickapp --config dev", log: false).strip,
@@ -76,6 +81,9 @@ platform :mac do
         export_compliance_uses_encryption: false,
         add_id_info_uses_idfa: false
       }
-    )
+    }
+    deliver_options[:build_number] = target_build_number unless target_build_number.empty?
+
+    deliver(deliver_options)
   end
 end
