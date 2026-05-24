@@ -12,7 +12,15 @@ platform :mac do
 
   desc "Build and sign the Mac App Store pkg"
   lane :package do
-    sh("cd #{ROOT} && ./script/package_app_store.sh").lines.last.strip
+    if ENV["PROMPT_PRODUCER_PREBUILT_PKG"]
+      next File.expand_path(ENV.fetch("PROMPT_PRODUCER_PREBUILT_PKG"))
+    end
+
+    UI.user_error!(
+      "Set PROMPT_PRODUCER_PREBUILT_PKG to a locally signed pkg. " \
+      "Use ./script/package_app_store.sh --prepare to build the signed app bundle first, " \
+      "then copy it to a clean package source before running productbuild."
+    )
   end
 
   desc "Upload Prompt Producer App Privacy answers"
@@ -26,7 +34,8 @@ platform :mac do
 
   desc "Upload Prompt Producer and submit it for Mac App Store review"
   lane :submit_review do
-    pkg_path = package
+    skip_binary_upload = ENV["PROMPT_PRODUCER_SKIP_BINARY_UPLOAD"] == "1"
+    pkg_path = skip_binary_upload ? nil : package
 
     review_information = {
       first_name: "Harborline",
@@ -53,6 +62,7 @@ platform :mac do
       skip_metadata: false,
       skip_screenshots: ENV["PROMPT_PRODUCER_SKIP_SCREENSHOTS"] == "1",
       overwrite_screenshots: ENV["PROMPT_PRODUCER_SKIP_SCREENSHOTS"] != "1",
+      skip_binary_upload: skip_binary_upload,
       submit_for_review: true,
       reject_if_possible: true,
       automatic_release: false,

@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+MODE="${1:-package}"
 BUILD_DIR="${PROMPT_PRODUCER_APPSTORE_DIR:-${TMPDIR:-/tmp}/prompt-producer-appstore}"
 VERSION="${PROMPT_PRODUCER_VERSION:-1.0}"
 BUILD_NUMBER="${PROMPT_PRODUCER_BUILD_NUMBER:-$(date +%Y%m%d%H%M)}"
@@ -42,15 +43,22 @@ INSTALLER_SIGNING_IDENTITY="$(resolve_identity "$INSTALLER_SIGNING_IDENTITY_REQU
 purge_bundle_metadata() {
   local bundle_path="$1"
 
-  find "$bundle_path" \( -name "._*" -o -name ".DS_Store" \) -delete 2>/dev/null || true
-  xattr -cr "$bundle_path" 2>/dev/null || true
+  BUNDLE_PATH="$bundle_path" /bin/bash <<'CLEAN_METADATA'
+set -euo pipefail
 
-  while IFS= read -r -d '' bundled_path; do
-    xattr -c "$bundled_path" 2>/dev/null || true
-    xattr -d "com.apple.provenance" "$bundled_path" 2>/dev/null || true
-    xattr -d "com.apple.FinderInfo" "$bundled_path" 2>/dev/null || true
-    xattr -d "com.apple.fileprovider.fpfs#P" "$bundled_path" 2>/dev/null || true
-  done < <(find "$bundle_path" -print0)
+find "$BUNDLE_PATH" \( -name "._*" -o -name ".DS_Store" \) -delete 2>/dev/null || true
+chmod -R u+w "$BUNDLE_PATH" 2>/dev/null || true
+
+while IFS= read -r -d '' bundled_path; do
+  if [[ -L "$bundled_path" ]]; then
+    /usr/bin/xattr -c -s "$bundled_path" 2>/dev/null || true
+    /usr/bin/xattr -d -s "com.apple.provenance" "$bundled_path" 2>/dev/null || true
+  else
+    /usr/bin/xattr -c "$bundled_path" 2>/dev/null || true
+    /usr/bin/xattr -d "com.apple.provenance" "$bundled_path" 2>/dev/null || true
+  fi
+done < <(/usr/bin/find "$BUNDLE_PATH" -print0)
+CLEAN_METADATA
 }
 
 strip_arm64e_slices() {
@@ -70,6 +78,22 @@ strip_arm64e_slices() {
     chmod "$mode" "$candidate"
   done < <(find "$bundle_path" -type f -print0)
 }
+
+if [[ "$MODE" != "--prepare" ]]; then
+  cat >&2 <<'MESSAGE'
+This script prepares a signed Mac App Store app bundle.
+
+Run:
+  ./script/package_app_store.sh --prepare
+
+Then copy the printed app bundle path to a clean package source with:
+  ditto --noextattr --norsrc "$APP_BUNDLE" "$PACKAGE_SOURCE_BUNDLE"
+
+Clear any remaining extended attributes from that source, run productbuild, and
+pass the pkg to Fastlane with PROMPT_PRODUCER_PREBUILT_PKG.
+MESSAGE
+  exit 64
+fi
 
 APP_BUNDLE="$(
   PROMPT_PRODUCER_DIST_DIR="$APP_BUNDLE_DIR" \
@@ -103,13 +127,8 @@ codesign \
   --timestamp=none \
   --entitlements "$ROOT_DIR/Distribution/AppStore.entitlements" \
   "$APP_BUNDLE"
+
+purge_bundle_metadata "$APP_BUNDLE"
 codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
 
-rm -f "$PKG_PATH"
-productbuild \
-  --component "$APP_BUNDLE" /Applications \
-  --sign "$INSTALLER_SIGNING_IDENTITY" \
-  "$PKG_PATH"
-
-pkgutil --check-signature "$PKG_PATH"
-echo "$PKG_PATH"
+echo "$APP_BUNDLE"
