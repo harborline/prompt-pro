@@ -14,11 +14,13 @@ set -euo pipefail
 PASS=0
 FAIL=0
 
+# pass prints a passing test message with the provided text and increments the global PASS counter.
 pass() {
     echo "  PASS: $1"
     PASS=$((PASS + 1))
 }
 
+# fail prints a failure message prefixed with "FAIL:" and increments the FAIL counter.
 fail() {
     echo "  FAIL: $1"
     FAIL=$((FAIL + 1))
@@ -26,7 +28,7 @@ fail() {
 
 # ---------------------------------------------------------------------------
 # Shared setup: create a stub xattr that records every invocation
-# ---------------------------------------------------------------------------
+# make_stub_dir creates a temporary directory containing an executable `xattr` stub that appends its received arguments to the file referenced by `$XATTR_LOG` and echoes the stub directory path.
 
 make_stub_dir() {
     local stub_dir
@@ -44,7 +46,9 @@ STUB
 }
 
 # Run the purge_bundle_metadata inline logic (as extracted from the script)
-# against a provided bundle path, using the stub xattr. Returns the log file path.
+# run_purge runs purge_bundle_metadata-like cleanup on a bundle path using the xattr stub found in the provided stub_dir.
+# It echoes the path to the xattr log file written inside stub_dir.
+# Parameters: bundle_path — path to the bundle to process; stub_dir — directory containing the stub xattr and where the log file will be created.
 run_purge() {
     local bundle_path="$1"
     local stub_dir="$2"
@@ -118,7 +122,7 @@ echo ""
 echo "=== Section 2: xattr call logic per file type ==="
 
 # Extract the conditional logic from the script and run it with a mock xattr.
-# We test: symlink → xattr -c -s; regular file → xattr -c; neither calls -d.
+# run_logic_with_mock records a mocked xattr invocation for the given path into the specified log file: it logs `-c -s <path>` if the path is a symlink, otherwise `-c <path>`.
 
 run_logic_with_mock() {
     local path="$1"

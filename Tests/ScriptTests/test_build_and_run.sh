@@ -8,12 +8,15 @@ set -uo pipefail
 PASS=0
 FAIL=0
 
+# pass echoes 'PASS: <msg>' to stdout and increments the global PASS counter.
 pass() { echo "PASS: $1"; PASS=$((PASS + 1)); }
+# fail prints a failure message prefixed with "FAIL:" and increments the global FAIL counter.
 fail() { echo "FAIL: $1"; FAIL=$((FAIL + 1)); }
 
 # ---------------------------------------------------------------------------
 # Helper: run a snippet in a subshell and return its exit code.
-# ---------------------------------------------------------------------------
+# run_subshell executes a shell snippet in a subshell while silencing stderr.
+# It evaluates the provided string with eval and exits with the snippet's exit status.
 run_subshell() {
     (eval "$1") 2>/dev/null
 }
@@ -98,7 +101,7 @@ fi
 #   - Copy when source exists AND destination does not exist.
 #   - Skip copy when destination already exists (idempotent; avoids clobbering).
 #   - Skip copy when source does not exist.
-# ===========================================================================
+# setup_dirs creates a temporary test directory, sets TMPDIR_CASE, RESOURCE_BUNDLE, and APP_RESOURCES, and ensures both resource and app directories exist.
 
 setup_dirs() {
     TMPDIR_CASE="$(mktemp -d)"
@@ -107,11 +110,12 @@ setup_dirs() {
     mkdir -p "$RESOURCE_BUNDLE" "$APP_RESOURCES"
 }
 
+# teardown_dirs removes the temporary test directory tree created for a test case.
 teardown_dirs() {
     rm -rf "$TMPDIR_CASE"
 }
 
-# Inline the changed condition logic so the test is self-contained.
+# run_blocknote_copy copies the BlockNoteEditor directory from the provided resource_bundle into app_resources only when the source exists and the destination does not; echoes "copied" on success and "skipped" otherwise.
 run_blocknote_copy() {
     local resource_bundle="$1"
     local app_resources="$2"

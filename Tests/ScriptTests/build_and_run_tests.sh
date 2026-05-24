@@ -9,18 +9,21 @@ set -euo pipefail
 PASS=0
 FAIL=0
 
+# pass prints a PASS line for the given message and increments the global PASS counter.
 pass() {
     echo "  PASS: $1"
     PASS=$((PASS + 1))
 }
 
+# fail prints a failing test message prefixed with "FAIL:" and increments the global FAIL counter.
 fail() {
     echo "  FAIL: $1"
     FAIL=$((FAIL + 1))
 }
 
 # Run a bash snippet and capture its exit code without triggering set -e.
-# Usage: capture_exit_code <varname> <script>
+# capture_exit_code runs a Bash snippet without letting the caller's `set -e` terminate execution and stores the snippet's exit code in the named variable.
+# <varname> is the name of the variable to receive the numeric exit code; <script> is the Bash snippet to execute.
 capture_exit_code() {
     local _varname="$1"
     local _script="$2"

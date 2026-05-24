@@ -40,6 +40,7 @@ resolve_identity() {
 APP_SIGNING_IDENTITY="$(resolve_identity "$APP_SIGNING_IDENTITY_REQUEST" codesigning)"
 INSTALLER_SIGNING_IDENTITY="$(resolve_identity "$INSTALLER_SIGNING_IDENTITY_REQUEST")"
 
+# purge_bundle_metadata removes common macOS metadata files (e.g. ._*, .DS_Store), makes bundle contents writable, and clears all extended attributes (using symlink-safe clearing for symlinks) for every file under the specified bundle directory.
 purge_bundle_metadata() {
   local bundle_path="$1"
 

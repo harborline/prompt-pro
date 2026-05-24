@@ -20,7 +20,9 @@ set -uo pipefail
 PASS=0
 FAIL=0
 
+# pass echoes a PASS message prefixed with "PASS: " for the given text and increments the global PASS counter.
 pass() { echo "PASS: $1"; PASS=$((PASS + 1)); }
+# fail echoes a failure message prefixed with 'FAIL:' and increments the FAIL counter.
 fail() { echo "FAIL: $1"; FAIL=$((FAIL + 1)); }
 
 # ---------------------------------------------------------------------------
@@ -31,6 +33,7 @@ fail() { echo "FAIL: $1"; FAIL=$((FAIL + 1)); }
 # ---------------------------------------------------------------------------
 XATTR_LOG=""
 
+# setup_xattr_spy creates a temporary XATTR_LOG and a mock xattr executable that appends each invocation's arguments to the log and exits successfully.
 setup_xattr_spy() {
     XATTR_LOG="$(mktemp)"
     # Create a mock xattr that logs calls and succeeds.
@@ -45,12 +48,13 @@ MOCK
     export XATTR_LOG
 }
 
+# teardown_xattr_spy removes the temporary xattr invocation log file and the mock xattr executable.
 teardown_xattr_spy() {
     rm -f "$XATTR_LOG" "$MOCK_XATTR_BIN"
 }
 
 # Run the post-PR purge_bundle_metadata loop body against a given path using
-# the spy xattr binary.
+# run_purge_loop_body invokes the provided xattr binary to clear all extended attributes on a path, using "-c -s" when the path is a symbolic link and "-c" otherwise.
 run_purge_loop_body() {
     local bundled_path="$1"
     local mock_xattr="$2"
