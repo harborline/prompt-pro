@@ -48,12 +48,12 @@ chmod +x "$APP_BINARY"
 
 find "$BUILD_BIN_DIR" -maxdepth 1 -type d -name "*.bundle" -print0 | while IFS= read -r -d '' resource_bundle; do
   bundle_name="$(basename "$resource_bundle")"
-  rm -rf "$APP_RESOURCES/$bundle_name"
+  rm -rf "${APP_RESOURCES:?}/${bundle_name:?}"
   cp -R "$resource_bundle" "$APP_RESOURCES/"
 done
 
-if [[ -d "$RESOURCE_BUNDLE/BlockNoteEditor" ]]; then
-  rm -rf "$APP_RESOURCES/BlockNoteEditor"
+if [[ -d "$RESOURCE_BUNDLE/BlockNoteEditor" && ! -d "$APP_RESOURCES/BlockNoteEditor" ]]; then
+  # Expose the editor assets at the app resource root for WebView loading.
   cp -R "$RESOURCE_BUNDLE/BlockNoteEditor" "$APP_RESOURCES/"
 fi
 

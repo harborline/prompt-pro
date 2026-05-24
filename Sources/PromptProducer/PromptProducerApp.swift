@@ -104,9 +104,6 @@ private struct MainLibrarySceneView: View {
                 openWindow(id: "main")
             }
             AppWindowLevelPreferences.applyToOpenWindows(keepWindowsOnTop: keepWindowsOnTop)
-            DispatchQueue.main.async {
-                AppWindowLevelPreferences.applyToOpenWindows(keepWindowsOnTop: keepWindowsOnTop)
-            }
         }
         .onChange(of: keepWindowsOnTop) { _, newValue in
             AppWindowLevelPreferences.applyToOpenWindows(keepWindowsOnTop: newValue)

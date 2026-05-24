@@ -87,6 +87,13 @@ enum AppWindowLevelPreferences {
         }
     }
 
+    /// Updates the given window's level based on the "keep windows on top" preference.
+    /// 
+    /// Sets the window's level to `.floating` when `keepWindowsOnTop` (or the stored preference) is true, otherwise uses the type-specific default level. The chosen level is reapplied once on the next run loop to counter AppKit resetting window levels during restoration or creation.
+    /// - Parameters:
+    ///   - window: The window to update.
+    ///   - keepWindowsOnTop: Optional override for the preference; when `nil`, the value is read from `defaults` using `AppPreferenceKeys.keepWindowsOnTop`.
+    ///   - defaults: The `UserDefaults` instance used to read the stored preference when `keepWindowsOnTop` is `nil`.
     static func apply(to window: NSWindow, keepWindowsOnTop: Bool? = nil, defaults: UserDefaults = .standard) {
         let shouldKeepOnTop = keepWindowsOnTop ?? defaults.bool(forKey: AppPreferenceKeys.keepWindowsOnTop)
         let level = shouldKeepOnTop
@@ -94,6 +101,7 @@ enum AppWindowLevelPreferences {
             : defaultLevel(for: window)
         window.level = level
 
+        // AppKit can reset levels while restoring or creating windows, so reapply once on the next run loop.
         DispatchQueue.main.async { [weak window] in
             window?.level = level
         }
